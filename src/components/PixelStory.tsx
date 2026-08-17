@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useHydrated } from '@/lib/use-hydrated';
 import Image from 'next/image';
 
 /**
@@ -78,6 +79,21 @@ const SCENES: SceneDef[] = [
   },
 ];
 
+/**
+ * Reads the replay flag. Called during render rather than from an effect: it is
+ * a pure read with no side effects, and doing it in an effect would mean a
+ * state update on every mount just to learn something already knowable.
+ */
+function readSeenFlag(): boolean {
+  try {
+    return window.localStorage.getItem(SEEN_KEY) === '1';
+  } catch {
+    // Private browsing or storage disabled — treat as a first visit. Showing
+    // the story twice is a far better failure than crashing the homepage.
+    return false;
+  }
+}
+
 /** The line the whole project is named for. */
 const WHISPER_LINE = 'Yet I have reserved 7,000 in Israel who have not bowed to Baal.';
 
@@ -103,15 +119,19 @@ function Scene({
   children, className = '',
 }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLElement>(null);
-  const [visible, setVisible] = useState(false);
+  // Lazily initialised rather than set from inside the effect: if the browser
+  // has no IntersectionObserver, the scene must start visible or it would never
+  // appear at all. Deciding that at construction avoids a state update in an
+  // effect, and the server always yields false so the observer path is the
+  // hydration-stable default.
+  const [visible, setVisible] = useState(
+    () => typeof window !== 'undefined' && typeof IntersectionObserver === 'undefined'
+  );
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-
-    // If the browser lacks IntersectionObserver, show everything immediately
-    // rather than leaving the scenes invisible.
-    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return; }
+    if (typeof IntersectionObserver === 'undefined') return;
 
     const obs = new IntersectionObserver(
       ([entry]) => {
@@ -177,19 +197,16 @@ function SceneCaption({ scene }: { scene: SceneDef }) {
 
 export default function PixelStory() {
   // null = not yet determined (pre-hydration). Rendering nothing in that state
-  // avoids a hydration mismatch between server HTML and the localStorage check.
-  const [seen, setSeen] = useState<boolean | null>(null);
-  const finaleRef = useRef<HTMLDivElement>(null);
+  // avoids a hydration mismatch between server HTML and the localStorage check,
+  // and avoids a flash of the wrong variant in either direction.
+  const hydrated = useHydrated();
+  // Set by the replay button so the story reappears without a reload. Null
+  // means "no override — trust what is in storage".
+  const [override, setOverride] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    try {
-      setSeen(window.localStorage.getItem(SEEN_KEY) === '1');
-    } catch {
-      // Private browsing or storage disabled — treat as a first visit. Showing
-      // the story twice is a far better failure than crashing the homepage.
-      setSeen(false);
-    }
-  }, []);
+  const seen: boolean | null = !hydrated ? null : (override ?? readSeenFlag());
+
+  const finaleRef = useRef<HTMLDivElement>(null);
 
   // Mark as seen once the reader actually reaches the resolution, not on mount.
   // Someone who bounces from the teaser should still get the story next time.
@@ -211,7 +228,7 @@ export default function PixelStory() {
 
   function replay() {
     try { window.localStorage.removeItem(SEEN_KEY); } catch { /* non-fatal */ }
-    setSeen(false);
+    setOverride(false);
   }
 
   if (seen === null) return null;

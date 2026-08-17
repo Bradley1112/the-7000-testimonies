@@ -107,11 +107,8 @@ class Canvas {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Shared palette anchors. The scenes use narrative earth tones, but every scene
-// is framed in the site green so the sequence stays tied to the brand.
-// ---------------------------------------------------------------------------
-const GREEN = '#454B1B';
+// The scenes use narrative earth tones; the site green frames them in the page
+// itself (see PixelStory borders) rather than inside the art.
 
 // ===========================================================================
 // SCENE 1 — The Fire on Carmel (1 Kings 18)

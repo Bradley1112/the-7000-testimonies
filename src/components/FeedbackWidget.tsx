@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useHydrated } from '@/lib/use-hydrated';
 
 /**
  * Thumbs up/down plus an optional comment, on each archived testimony.
@@ -30,11 +31,9 @@ export default function FeedbackWidget({ testimonyId }: { testimonyId: string })
   const [showComment, setShowComment] = useState(false);
   const [comment, setComment] = useState('');
   const [done, setDone] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // Render nothing until mounted: the "already voted" state comes from
+  // Render nothing until hydrated: the "already voted" state comes from
   // localStorage, which does not exist during server rendering.
-  useEffect(() => { setMounted(true); }, []);
+  const mounted = useHydrated();
 
   async function send(next: { rating?: 'up' | 'down'; comment?: string }) {
     try {
