@@ -1,0 +1,16 @@
+# The 7000 — daily engine
+#
+# Pinned to minor versions: this runs unattended on a schedule, and a surprise
+# breaking change in a transitive dependency would fail silently at 7am.
+
+requests~=2.32          # HTTP with a real User-Agent (several sources 403 without one)
+feedparser~=6.0         # RSS/Atom parsing, tolerant of the malformed feeds in the wild
+trafilatura~=2.0        # article text extraction — strips nav, ads, scripts
+beautifulsoup4~=4.12    # HTML index scraping for sources with no feed (Jawaban)
+lxml~=5.3               # parser backend for the above
+thefuzz~=0.22           # fuzzy title matching for cross-source duplicate detection
+python-Levenshtein~=0.26 # C speedup for thefuzz; without it thefuzz warns and crawls
+supabase~=2.10          # database client
+python-dotenv~=1.0      # local .env loading
+google-genai~=1.0       # Gemini (default summariser)
+anthropic~=0.40         # Claude Haiku (documented fallback)

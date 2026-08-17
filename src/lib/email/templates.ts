@@ -47,11 +47,11 @@ export function emailShell({
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GREEN_PALE};">
   <tr>
     <td align="center" style="padding:24px 12px;">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:${PAPER};border:1px solid ${RULE};">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:${PAPER};border:1px solid ${RULE};">
         ${body}
       </table>
 
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
         <tr><td style="padding:20px 24px;font-family:${SANS};font-size:12px;line-height:1.6;color:${INK_FAINT};text-align:center;">
           <p style="margin:0 0 8px 0;">
             The 7000 &mdash; daily testimonies from across Southeast Asia.

@@ -49,3 +49,9 @@ next-env.d.ts
 engine/.venv/
 __pycache__/
 *.pyc
+
+# engine artefacts
+engine/preview.html
+engine/.venv/
+public/_preview.html
+edition-preview.html
