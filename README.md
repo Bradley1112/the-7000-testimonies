@@ -28,6 +28,8 @@ Full reasoning for every decision, including two reversals, is in `source_vettin
 
 ## Getting it running
 
+**Launching for the first time? Follow [LAUNCH.md](LAUNCH.md)** — an ordered checklist with this project's actual values filled in. The section below is the general reference.
+
 You need four free accounts: Supabase, Vercel, Brevo and Google AI Studio.
 
 ### 1. Clone and install
