@@ -64,8 +64,16 @@ class Config:
     # free tier proved too tight for a daily run — gemini-3.7-flash allows only
     # 20 requests/day and one edition needs roughly 15-20.
     groq_api_key: str = field(default_factory=lambda: os.environ.get("GROQ_API_KEY", ""))
+    # llama-3.3-70b-versatile (the original choice) has been retired entirely —
+    # not renamed, just absent from /v1/models for this key as of 2026-08-17.
+    # openai/gpt-oss-20b is OpenAI's open-weight model, hosted on Groq. Verified
+    # against a real article: clean separation of reasoning from the visible
+    # answer (unlike Gemini 3.x, reasoning tokens don't eat the output budget
+    # from the same pool), finish_reason=stop, and it names the subject and
+    # specific details faithfully. gpt-oss-120b is very slightly more fluent
+    # but slower for no material quality gain on this task.
     groq_model: str = field(
-        default_factory=lambda: os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+        default_factory=lambda: os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
     )
 
     # --- Selection --------------------------------------------------------

@@ -105,13 +105,13 @@ def _from_rss(session: requests.Session, source: Source) -> list[Candidate]:
     return out
 
 
-# Jawaban encodes the publication date in the article path:
-#   /read/article/id/YYYY/MM/DD/<category>/<timestamp>/<slug>
-# which means no date parsing from page content is needed at all.
-_JAWABAN_DATE = re.compile(r"/read/article/id/(\d{4})/(\d{2})/(\d{2})/")
+# Jawaban encodes both the publication date AND the article's own category in
+# its path: /read/article/id/YYYY/MM/DD/<category>/<timestamp>/<slug>
+_JAWABAN_ARTICLE = re.compile(r"/read/article/id/(\d{4})/(\d{2})/(\d{2})/(\d+)/")
 
 # Category ids worth reading for testimony. 521 = ImpactStory, 1 = Inspiring.
 _JAWABAN_CATEGORIES = ("521/ImpactStory.html", "1/Inspiring.html")
+_JAWABAN_CATEGORY_IDS = {"521", "1"}
 
 
 def _from_html_index(session: requests.Session, source: Source) -> list[Candidate]:
@@ -148,13 +148,25 @@ def _from_html_index(session: requests.Session, source: Source) -> list[Candidat
                 continue
             seen.add(canon)
 
-            m = _JAWABAN_DATE.search(canon)
+            m = _JAWABAN_ARTICLE.search(canon)
             published = None
             if m:
                 try:
                     published = datetime(int(m[1]), int(m[2]), int(m[3]), tzinfo=timezone.utc)
                 except ValueError:
                     published = None
+
+            # Category pages link out to "related" content from OTHER
+            # categories, not just their own — confirmed live: a Daniel-10
+            # Bible-exposition piece (category 518, devotional) was found
+            # linked from the ImpactStory testimony index and got summarised
+            # as if it were a testimony. The article's own category is in its
+            # URL, so check it explicitly rather than trusting the page it was
+            # found on. No match (URL shape unexpected) is treated as unsafe
+            # and skipped, not passed through.
+            category_id = m.group(4) if m else None
+            if category_id not in _JAWABAN_CATEGORY_IDS:
+                continue
 
             # The anchor text is often an image or empty; fall back to the slug,
             # which is a readable, underscore-separated version of the headline.

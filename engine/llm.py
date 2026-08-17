@@ -217,6 +217,13 @@ def _groq(system: str, user: str, max_tokens: int) -> Completion:
             ],
             "temperature": TEMPERATURE,
             "max_tokens": max_tokens,
+            # gpt-oss models reason before answering, in a separate field that
+            # does not eat max_tokens the way Gemini's thinking tokens do — but
+            # it still costs latency and some of the completion budget for no
+            # benefit on a faithful-rewrite task. "low" measured at ~10
+            # reasoning tokens vs ~140 on the default, with no quality loss on
+            # a real testimony article.
+            "reasoning_effort": "low",
         },
         timeout=config.request_timeout,
     )
