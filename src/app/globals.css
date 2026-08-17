@@ -1,26 +1,184 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---------------------------------------------------------------------------
+   The 7000 — design tokens
+
+   Green and white, editorial rather than dashboard. The palette is deliberately
+   narrow: one green in five weights, one warm paper white, one ink. Anything
+   that needs to feel like a devotional product does it with type and space,
+   not with more colours.
+
+   No dark mode. This is a reading product whose identity is white paper; a dark
+   variant would need a second full palette and a second set of art framings for
+   very little gain at this scale. The starter dark-mode block is removed rather
+   than left half-wired.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Primary green, from the brief, plus a scale built around it. */
+  --color-green-900: #23270d;
+  --color-green-800: #343a14;
+  --color-green-700: #454b1b;  /* the brand green */
+  --color-green-600: #5a6226;
+  --color-green-500: #737c34;
+  --color-green-300: #a8ae7e;
+  --color-green-100: #e4e7d5;
+  --color-green-50:  #f4f6ec;
+
+  /* Paper + ink */
+  --color-paper:     #fdfdfb;
+  --color-paper-alt: #f7f7f2;
+  --color-ink:       #1c1d17;
+  --color-ink-soft:  #4a4c42;
+  --color-ink-faint: #7c7e72;
+  --color-rule:      #e2e3d9;
+
+  --font-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-pixel: 'Press Start 2P', ui-monospace, monospace;
+
+  /* Editorial measure — long-form body text should never run wider than this. */
+  --container-measure: 34rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  scroll-behavior: smooth;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Readers who ask for less motion get none of the scroll animation. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------------------------------------------------------------------------
+   Pixel font. Self-hosted rather than pulled from Google Fonts at runtime:
+   one less third-party request, no layout shift, and the scroll story still
+   works if fonts.gstatic.com is blocked. See README for the download step.
+   The fallback stack is monospace, which degrades acceptably.
+--------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('/fonts/press-start-2p.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
+   Pixel art rendering. Without this the browser smooths the upscaled SVG/PNG
+   and the whole 8-bit effect is lost.
+--------------------------------------------------------------------------- */
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollytelling
+
+   Scenes start hidden and are revealed by an IntersectionObserver adding
+   .is-visible. Doing the reveal in CSS keyframes rather than JS keeps the
+   animation off the main thread.
+
+   The `.no-js` guard matters: if JS fails, the observer never fires, and
+   without this every scene would stay at opacity 0 — the story would silently
+   vanish. A <noscript> style flips them all visible instead.
+--------------------------------------------------------------------------- */
+.scene-layer {
+  opacity: 0;
+  transform: translateY(14px);
+  will-change: opacity, transform;
+}
+
+/*
+  The final state is declared, not merely animated to.
+
+  An earlier version relied solely on `animation: ... forwards` to reach
+  opacity 1. That fails whenever the animation never runs — a tab backgrounded
+  during load, a browser that suspends animation on hidden documents, or an
+  engine that drops the keyframes — and the art then stays invisible forever.
+  Declaring the end state means the cascade alone is enough; the animation only
+  makes the arrival pretty.
+*/
+/*
+  A transition rather than a keyframe animation, deliberately.
+
+  With `animation ... forwards` the layer only reaches opacity 1 if the
+  animation actually runs; with `both` it is worse, because the backwards fill
+  applies the from-keyframe (opacity 0) and overrides any declared end state
+  until the animation starts. Either way the art can end up permanently
+  invisible in a tab that suspends animations.
+
+  A transition has no such failure mode: `.is-visible` sets the final value, and
+  if the transition never runs the element simply snaps to it.
+*/
+.scene-layer {
+  transition:
+    opacity 900ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.is-visible .scene-layer {
+  opacity: 1;
+  transform: none;
+}
+.is-visible .scene-layer[data-delay="1"] { transition-delay: 180ms; }
+.is-visible .scene-layer[data-delay="2"] { transition-delay: 420ms; }
+.is-visible .scene-layer[data-delay="3"] { transition-delay: 700ms; }
+
+@keyframes scene-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* The fire column in scene 1 gets a flicker once it has arrived. */
+.is-visible .scene-flicker { animation: flicker 2.4s steps(3) infinite 900ms; }
+@keyframes flicker {
+  0%, 100% { filter: brightness(1); }
+  40%      { filter: brightness(1.14); }
+  70%      { filter: brightness(0.93); }
+}
+
+/* Scene 2: the sun beats down. Slow, so it reads as heat rather than a blink. */
+.is-visible .scene-pulse { animation: pulse 4s ease-in-out infinite 900ms; }
+@keyframes pulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.08) saturate(1.1); }
+}
+
+/* RPG dialogue box: text types itself in once the scene lands.
+   As with .scene-layer, the open state is declared so the line is readable
+   even if the keyframes never run. */
+.typewriter {
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.is-visible .typewriter {
+  width: 100%;
+  animation: typewriter 2.2s steps(48, end) both 500ms;
+}
+@keyframes typewriter { from { width: 0; } to { width: 100%; } }
+
+/* On narrow screens the dialogue line has to wrap, and a width-based
+   typewriter cannot animate wrapped text. Fall back to a plain fade. */
+@media (max-width: 40rem) {
+  .typewriter {
+    width: auto;
+    white-space: normal;
+    animation: none;
+  }
+  .is-visible .typewriter { animation: scene-rise 700ms ease forwards 400ms; }
 }
