@@ -158,8 +158,13 @@ def build_country(edition_id: str, code: str, name: str,
 
     out: list[EmailTestimony] = []
     rank = 0
+    source_names = {s.id: s.name for s in db.approved_sources()}
+
     for cand, sc in chosen:
-        result = llm.summarise_testimony(cand.text or "", cand.url, cand.source.primary_language)
+        result = llm.summarise_testimony(
+            cand.text or "", cand.url, cand.source.primary_language,
+            fallback_title=cand.title,
+        )
 
         if not result.ok:
             log.warning("summary failed for %r: %s", cand.title[:60], result.error)
@@ -172,31 +177,38 @@ def build_country(edition_id: str, code: str, name: str,
         # The model's own veto. This is the backstop that catches what the
         # keyword heuristic gets wrong — a persecution story that scored well
         # on recency and source standing still gets dropped here.
-        if NOT_A_TESTIMONY in result.text:
+        if not result.is_testimony:
             log.info("model rejected as non-testimony: %r", cand.title[:70])
             # This IS a real decision — the model read actual content and
             # judged it non-testimony — so it is excluded going forward.
             db.mark_processed(cand.source.id, cand.url, cand.title, selected=False)
             continue
 
+        # The model returns an English title; for non-English sources that is a
+        # translation of the outlet's headline. Keep the original so a reader
+        # clicking through recognises what they land on.
+        english_title = result.title or cand.title
+        translated = cand.source.needs_translation and english_title != cand.title
+        original_title = cand.title if translated else None
+
         rank += 1
         merged_ids = merged.get(cand.url, [])
         db.save_testimony(
             edition_id=edition_id, country_code=code, source_id=cand.source.id,
-            title=cand.title, url=cand.url, summary=result.text, rank=rank, score=sc,
-            published_at=cand.published_at, translated=cand.source.needs_translation,
+            title=english_title, url=cand.url, summary=result.summary, rank=rank, score=sc,
+            published_at=cand.published_at, translated=translated,
             language=cand.source.primary_language, model=result.model, merged=merged_ids,
+            original_title=original_title,
         )
         db.mark_processed(cand.source.id, cand.url, cand.title, selected=True)
 
-        source_names = {s.id: s.name for s in db.approved_sources()}
         out.append(EmailTestimony(
-            title=cand.title,
-            summary=result.text,
+            title=english_title,
+            summary=result.summary,
             url=cand.url,
             source_name=cand.source.name,
             also_from=[source_names.get(i, "another outlet") for i in merged_ids],
-            translated_from=(cand.source.primary_language if cand.source.needs_translation else None),
+            translated_from=(cand.source.primary_language if translated else None),
         ))
 
     log.info("%s — %d testimon%s selected", name, len(out), "y" if len(out) == 1 else "ies")

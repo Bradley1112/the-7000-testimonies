@@ -188,18 +188,35 @@ def create_edition(edition_date: date) -> str:
 def save_testimony(edition_id: str, country_code: str, source_id: str, title: str,
                    url: str, summary: str, rank: int, score: float,
                    published_at: datetime | None, translated: bool, language: str,
-                   model: str, merged: list[str] | None = None) -> str | None:
+                   model: str, merged: list[str] | None = None,
+                   original_title: str | None = None) -> str | None:
+    payload = {
+        "edition_id": edition_id, "country_code": country_code, "source_id": source_id,
+        "title": title[:500], "original_url": url, "summary": summary, "rank": rank,
+        "selection_score": round(score, 3),
+        "article_published_at": published_at.isoformat() if published_at else None,
+        "was_translated": translated, "original_language": language,
+        "model_used": model, "merged_source_ids": merged or [],
+        "original_title": original_title[:500] if original_title else None,
+    }
     try:
-        row = client().table("testimonies").insert({
-            "edition_id": edition_id, "country_code": country_code, "source_id": source_id,
-            "title": title[:500], "original_url": url, "summary": summary, "rank": rank,
-            "selection_score": round(score, 3),
-            "article_published_at": published_at.isoformat() if published_at else None,
-            "was_translated": translated, "original_language": language,
-            "model_used": model, "merged_source_ids": merged or [],
-        }).execute().data
+        row = client().table("testimonies").insert(payload).execute().data
         return row[0]["id"] if row else None
     except Exception as exc:  # noqa: BLE001
+        # Migration 0004 adds original_title. If it has not been applied yet,
+        # save the testimony without it rather than losing the whole edition to
+        # a missing nice-to-have column — the English title, which is the part
+        # that actually matters, lives in `title` either way.
+        if "original_title" in str(exc):
+            log.warning("original_title column missing — apply migration 0004. "
+                        "Saving without it for now.")
+            payload.pop("original_title", None)
+            try:
+                row = client().table("testimonies").insert(payload).execute().data
+                return row[0]["id"] if row else None
+            except Exception as exc2:  # noqa: BLE001
+                log.error("could not save testimony %r: %s", title[:60], exc2)
+                return None
         log.error("could not save testimony %r: %s", title[:60], exc)
         return None
 

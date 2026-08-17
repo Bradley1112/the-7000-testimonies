@@ -50,12 +50,16 @@ class Config:
     # gemini-2.5-flash, the model named in the original brief, returns 404
     # "no longer available to new users" for any API key created after Google
     # retired it from new-user access — confirmed 2026-08-17 against a live key.
-    # gemini-3.7-flash is the current stable, non-preview flash-tier model.
+    #
+    # gemini-3.5-flash is the chosen replacement, on a billing-enabled key. The
+    # free tier was not viable: gemini-3.7-flash caps at 20 requests/day and one
+    # edition needs 15-20. Free alternatives were tried and rejected on quality.
+    #
     # Deliberately not "gemini-flash-latest": an alias that can silently move
     # under a scheduled job is the wrong trade for something that needs
     # consistent tone day to day. If Google retires this one too, the fix is
     # the same one-line env var change, not a rewrite.
-    gemini_model: str = field(default_factory=lambda: os.environ.get("GEMINI_MODEL", "gemini-3.7-flash"))
+    gemini_model: str = field(default_factory=lambda: os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"))
     anthropic_api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
     anthropic_model: str = field(
         default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")

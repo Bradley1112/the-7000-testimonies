@@ -19,6 +19,7 @@ Cost control, per the brief:
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 
@@ -41,8 +42,8 @@ class Completion:
 # ---------------------------------------------------------------------------
 
 TESTIMONY_SYSTEM_PROMPT = """\
-You are writing for "The 7000," a daily Christian newsletter that collects and
-summarizes real testimonies of God's work happening today across Southeast Asia.
+You are writing for "The 7000," a daily Christian newsletter that collects real
+testimonies of God's work happening today across Southeast Asia.
 
 CONTEXT: The 7000 exists because testimonies of God's active work are scattered
 across many small local outlets and rarely seen together. Named after 1 Kings
@@ -51,29 +52,69 @@ God told him 7,000 others had not bowed to Baal - this newsletter exists to
 remind Protestant, non-denominational Christian readers that they are not
 alone, and that God is still visibly moving today.
 
-YOUR TASK: Summarize the testimony article provided below in 5-7 sentences.
-The summary should be warm, encouraging, and grounded - never sensationalized
-or exaggerated. It should make the reader want to click through and read the
-full original article, not replace the need to read it.
+=== STEP 1: IS THIS ACTUALLY A TESTIMONY? ===
 
-STRICT RULES:
-- Only use facts, names, and details explicitly present in the article text
-  provided. Never invent or infer details not stated in the source.
+A testimony tells what God has done in the life of a specific, identifiable
+person. It needs BOTH: a real person, and something that actually happened to
+them.
+
+The following are NOT testimonies. Reject them:
+  - Bible teaching, exposition, or commentary about a passage or a biblical
+    figure. An article about Daniel, Esther or Paul is teaching about the
+    Bible, not a testimony of God at work today - no matter how edifying.
+  - Devotional reflections, general encouragement, or lessons drawn from an
+    experience where no specific person's story is actually told.
+  - News: disasters, court cases, persecution, politics, appointments.
+  - Event announcements, conference reports, product launches, book releases.
+  - Opinion columns, advice pieces, or listicles.
+
+If the article is not a testimony, respond with exactly:
+NOT_A_TESTIMONY
+and nothing else.
+
+Be strict. When in doubt, reject. A day with fewer testimonies is far better
+than a day with something that is not a testimony dressed up as one - that is
+the single failure this newsletter cannot afford.
+
+=== STEP 2: IF IT IS A TESTIMONY, WRITE THIS EXACT FORMAT ===
+
+TITLE: <the article's headline, in English>
+SUMMARY: <5-7 sentences>
+
+Output nothing else. No preamble, no markdown, no bullet points.
+
+--- TITLE RULES ---
+- ALWAYS in English. If the original headline is in another language, translate
+  it into natural English. Never leave it in the original language, and never
+  transliterate it.
+- Stay close to the original meaning. Do not sensationalise it.
+- Keep personal names, place names and organisation names as they are.
+
+--- VOICE RULES (these were the most common failure) ---
+- Write in the third person throughout. NEVER switch person partway through.
+- NEVER write as though you are the subject. Do not write "I fell", "my knees",
+  "we prayed". The subject is someone else and you are telling their story.
+- Tell the story directly. NEVER refer to the article or its author. Banned
+  phrases: "the author", "the writer", "this article", "the piece", "the story
+  describes", "the article notes", "he explains that". The reader should feel
+  they are being told what happened, not handed a book report about a web page.
+- Name the person the story is about, if the article names them. Use their
+  name - not "a 23-year-old" or "the author" or "one believer".
+
+--- TONE RULES ---
+- Warm, encouraging and grounded. Sincere, never hyped.
+- No exclamation marks. No clickbait phrasing.
+- Prefer the concrete over the abstract: say what actually happened to this
+  person, rather than the general lesson a reader might draw.
+- End with a short, natural invitation to read the full story. Vary how you
+  word it - do not reuse the same closing sentence every time.
+
+--- FAITHFULNESS RULES ---
+- Only use facts, names and details explicitly present in the article text.
+  Never invent or infer anything the source does not state.
 - Do not fabricate quotes.
-- If the article's claims are vague or unclear, keep your summary
-  correspondingly modest - do not add certainty the source doesn't support.
-- End with a short, natural invitation to read the full story.
-- Do not use exclamation-point-heavy or "clickbait" language - the tone
-  should be sincere, not hype-driven.
-- Write in English regardless of the language of the source article. If the
-  article is not in English, translate faithfully; do not embellish in
-  translation, and keep proper nouns in their original form.
-- Output only the summary itself. No preamble, no heading, no bullet points.
-
-IMPORTANT: If the article is not actually a testimony - if it is a disaster
-report, a persecution or court story, an event announcement, or general news -
-respond with exactly the token NOT_A_TESTIMONY and nothing else. It is far
-better to drop an article than to force news into a devotional register.\
+- If the article's claims are vague, keep your summary correspondingly modest.
+  Do not add certainty the source does not support.\
 """
 
 COUNTRY_SYSTEM_PROMPT = """\
@@ -87,6 +128,10 @@ showed, taken together.
 STRICT RULES:
 - Base this only on the summaries provided. Introduce no new facts.
 - Do not overstate. If there is only one testimony, simply reflect it.
+- Write in the third person. Never refer to "the testimony", "the article",
+  "the story" or "the summary" - speak about the people and what happened to
+  them, not about the text you were given.
+- Warm and grounded, never hyped. No exclamation marks.
 - No preamble or heading. Output the sentences only.\
 """
 
@@ -109,6 +154,10 @@ STRICT RULES:
 - If summaries from only ONE country are provided, do not write as though you
   are describing a regional pattern. Reflect honestly on that one country's
   testimonies instead. Never imply breadth the material does not support.
+- Write in the third person. Never refer to "the testimony", "the summaries",
+  "the article" or "the stories provided" - write about the people and what
+  God did, not about the text you were handed.
+- No exclamation marks.
 - No preamble or heading. Output the summary only.\
 """
 
@@ -269,16 +318,80 @@ def complete(system: str, user: str, kind: str = "testimony", retries: int = 2) 
     return Completion("", model_name, False, last_error)
 
 
-def summarise_testimony(article_text: str, url: str, language: str = "en") -> Completion:
-    """Returns a Completion whose text is the summary, or NOT_A_TESTIMONY."""
+@dataclass
+class TestimonySummary:
+    """Parsed result of a testimony summarisation."""
+    ok: bool
+    is_testimony: bool
+    title: str = ""       # always English
+    summary: str = ""
+    model: str = ""
+    error: str | None = None
+
+
+# The model is asked for "TITLE: ...\nSUMMARY: ...". Tolerate the usual drift:
+# markdown bold, leading hashes, different capitalisation.
+_TITLE_RE = re.compile(r"^\s*(?:[#*\s]*)title\s*[:\-]\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
+_SUMMARY_RE = re.compile(r"^\s*(?:[#*\s]*)summary\s*[:\-]\s*(.*)$", re.IGNORECASE | re.MULTILINE | re.DOTALL)
+
+
+def _strip_markup(s: str) -> str:
+    return s.replace("**", "").replace("*", "").strip().strip('"').strip()
+
+
+def summarise_testimony(article_text: str, url: str, language: str = "en",
+                        fallback_title: str = "") -> TestimonySummary:
+    """
+    Summarise one article, returning an English title and body, or a
+    not-a-testimony verdict.
+
+    The title comes back from the model rather than being taken from the feed
+    because a non-English source would otherwise pair an English summary with
+    an untranslated headline — which is exactly what shipped in the first real
+    test send.
+    """
     note = ""
     if language and language != "en":
-        note = f"\nNOTE: This article is written in language code '{language}'. Translate to English.\n"
+        note = (
+            f"\nNOTE: This article is written in language code '{language}'. "
+            f"Translate BOTH the title and the summary into English.\n"
+        )
 
-    user = (
-        f"{note}\nARTICLE TEXT:\n{article_text}\n\nORIGINAL SOURCE URL:\n{url}\n"
+    user = f"{note}\nARTICLE TEXT:\n{article_text}\n\nORIGINAL SOURCE URL:\n{url}\n"
+    result = complete(TESTIMONY_SYSTEM_PROMPT, user, kind="testimony")
+
+    if not result.ok:
+        return TestimonySummary(ok=False, is_testimony=False, model=result.model, error=result.error)
+
+    text = result.text.strip()
+
+    if "NOT_A_TESTIMONY" in text.upper():
+        return TestimonySummary(ok=True, is_testimony=False, model=result.model)
+
+    title_match = _TITLE_RE.search(text)
+    summary_match = _SUMMARY_RE.search(text)
+
+    title = _strip_markup(title_match.group(1)) if title_match else ""
+    summary = _strip_markup(summary_match.group(1)) if summary_match else ""
+
+    # If the model ignored the format entirely, treat the whole response as the
+    # summary rather than discarding usable work, and fall back to the source's
+    # own headline. Losing a good summary to a formatting slip would be worse
+    # than an occasionally untranslated title.
+    if not summary:
+        summary = _strip_markup(text)
+        title = title or fallback_title
+
+    if not summary:
+        return TestimonySummary(ok=False, is_testimony=False, model=result.model,
+                                error="model returned no usable summary")
+
+    return TestimonySummary(
+        ok=True, is_testimony=True,
+        title=title or fallback_title,
+        summary=summary,
+        model=result.model,
     )
-    return complete(TESTIMONY_SYSTEM_PROMPT, user, kind="testimony")
 
 
 def summarise_country(country_name: str, summaries: list[str]) -> Completion:
