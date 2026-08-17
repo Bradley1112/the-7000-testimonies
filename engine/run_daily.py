@@ -114,7 +114,21 @@ def infer_country(title: str) -> str | None:
 
 def build_country(edition_id: str, code: str, name: str,
                   candidates: list[Candidate]) -> list[EmailTestimony]:
-    """Fetch, dedupe, select, summarise and store one country's testimonies."""
+    """
+    Fetch, dedupe, select, summarise and store one country's testimonies.
+
+    processed_articles is written to in exactly two situations, both genuine
+    editorial decisions: an article that competed in scoring and lost to a
+    better candidate, or an article the model actually read and judged not to
+    be a testimony. Both are legitimate reasons never to reconsider it.
+
+    It is deliberately NOT written to when extraction fails or the model call
+    fails — those are infrastructure problems, not judgments about the
+    article. A run caught in an LLM outage (as happened once during setup,
+    when the configured model had been retired) must not permanently
+    blacklist every article it touched that day; the fix is for tomorrow's run
+    to see the same candidates again with working infrastructure.
+    """
     log.info("%s — %d candidate(s) inside the window", name, len(candidates))
 
     # Text first: the scorer reads the body for specificity and theme signals,
@@ -122,10 +136,10 @@ def build_country(edition_id: str, code: str, name: str,
     with_text: list[Candidate] = []
     for cand in candidates[:25]:  # cap the fetch budget per country per day
         text = fetch_text(cand)
-        db.mark_processed(cand.source.id, cand.url, cand.title, selected=False)
         if text:
             cand.text = text
             with_text.append(cand)
+        # else: extraction failed. Left unmarked on purpose — see docstring.
 
     if not with_text:
         log.info("%s — nothing extractable today", name)
@@ -133,6 +147,14 @@ def build_country(edition_id: str, code: str, name: str,
 
     survivors, merged = selection.resolve_duplicates(with_text)
     chosen = selection.top_n(survivors, config.max_per_country)
+    chosen_urls = {c.url for c, _ in chosen}
+
+    # Everything that was actually scored and lost is a real decision: mark it
+    # now so it is not re-fetched and re-scored every day for the rest of the
+    # lookback window.
+    for cand in survivors:
+        if cand.url not in chosen_urls:
+            db.mark_processed(cand.source.id, cand.url, cand.title, selected=False)
 
     out: list[EmailTestimony] = []
     rank = 0
@@ -143,6 +165,8 @@ def build_country(edition_id: str, code: str, name: str,
             log.warning("summary failed for %r: %s", cand.title[:60], result.error)
             db.log_scrape_failure(cand.source.id, cand.source.name, "summarise",
                                   result.error or "unknown", cand.url)
+            # Not marked processed — a model/infra failure, not a verdict on
+            # the article. See docstring.
             continue
 
         # The model's own veto. This is the backstop that catches what the
@@ -150,6 +174,9 @@ def build_country(edition_id: str, code: str, name: str,
         # on recency and source standing still gets dropped here.
         if NOT_A_TESTIMONY in result.text:
             log.info("model rejected as non-testimony: %r", cand.title[:70])
+            # This IS a real decision — the model read actual content and
+            # judged it non-testimony — so it is excluded going forward.
+            db.mark_processed(cand.source.id, cand.url, cand.title, selected=False)
             continue
 
         rank += 1

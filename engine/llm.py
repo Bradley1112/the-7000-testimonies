@@ -143,6 +143,21 @@ def _gemini(system: str, user: str, max_tokens: int) -> Completion:
             system_instruction=system,
             temperature=TEMPERATURE,
             max_output_tokens=max_tokens,
+            # Gemini 3.x models spend part of max_output_tokens on invisible
+            # reasoning before emitting anything. Measured on 2026-08-17: a
+            # 400-token budget produced 380 thinking tokens and 16 visible
+            # ones, truncating every summary mid-sentence (finishReason
+            # MAX_TOKENS). The brief's token budgets were sized for the older
+            # non-thinking 2.5-flash.
+            #
+            # thinking_budget=0 disables it outright — verified 0 thought
+            # tokens and finishReason STOP. thinking_level="low" is NOT a
+            # substitute; it still burned 384 tokens in the same test.
+            #
+            # Faithful summarisation under strict no-invention rules is a
+            # constrained rewriting task, not one that benefits from chain of
+            # thought, so nothing of value is lost here.
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )
     text = (resp.text or "").strip()
@@ -174,6 +189,48 @@ def _anthropic(system: str, user: str, max_tokens: int) -> Completion:
     return Completion(text, config.anthropic_model, True)
 
 
+def _groq(system: str, user: str, max_tokens: int) -> Completion:
+    """
+    Groq — free tier, no card required, and fast (sub-second on small models).
+
+    Uses plain `requests` against Groq's OpenAI-compatible endpoint rather than
+    the groq SDK: it is one HTTP POST, `requests` is already a dependency, and
+    avoiding another package keeps the GitHub Actions install lean.
+
+    No thinking-token workaround is needed here — the Llama models Groq serves
+    are not reasoning models, so max_tokens means what it says.
+    """
+    import requests
+
+    key = config.groq_api_key
+    if not key:
+        return Completion("", config.groq_model, False, "GROQ_API_KEY is not set.")
+
+    resp = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json={
+            "model": config.groq_model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": TEMPERATURE,
+            "max_tokens": max_tokens,
+        },
+        timeout=config.request_timeout,
+    )
+
+    if not resp.ok:
+        return Completion("", config.groq_model, False, f"{resp.status_code} {resp.text[:300]}")
+
+    data = resp.json()
+    text = (data.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+    if not text:
+        return Completion("", config.groq_model, False, "empty response")
+    return Completion(text, config.groq_model, True)
+
+
 def complete(system: str, user: str, kind: str = "testimony", retries: int = 2) -> Completion:
     """
     Single entry point for all model calls.
@@ -184,8 +241,13 @@ def complete(system: str, user: str, kind: str = "testimony", retries: int = 2) 
     """
     max_tokens = MAX_TOKENS.get(kind, 400)
     provider = config.llm_provider
-    fn = _gemini if provider == "gemini" else _anthropic
-    model_name = config.gemini_model if provider == "gemini" else config.anthropic_model
+
+    providers = {
+        "gemini": (_gemini, config.gemini_model),
+        "anthropic": (_anthropic, config.anthropic_model),
+        "groq": (_groq, config.groq_model),
+    }
+    fn, model_name = providers.get(provider, (_gemini, config.gemini_model))
 
     last_error = "not attempted"
     for attempt in range(retries + 1):

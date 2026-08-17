@@ -47,10 +47,25 @@ class Config:
     # --- Model ------------------------------------------------------------
     llm_provider: str = field(default_factory=lambda: os.environ.get("LLM_PROVIDER", "gemini").lower())
     gemini_api_key: str = field(default_factory=lambda: os.environ.get("GEMINI_API_KEY", ""))
-    gemini_model: str = field(default_factory=lambda: os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"))
+    # gemini-2.5-flash, the model named in the original brief, returns 404
+    # "no longer available to new users" for any API key created after Google
+    # retired it from new-user access — confirmed 2026-08-17 against a live key.
+    # gemini-3.7-flash is the current stable, non-preview flash-tier model.
+    # Deliberately not "gemini-flash-latest": an alias that can silently move
+    # under a scheduled job is the wrong trade for something that needs
+    # consistent tone day to day. If Google retires this one too, the fix is
+    # the same one-line env var change, not a rewrite.
+    gemini_model: str = field(default_factory=lambda: os.environ.get("GEMINI_MODEL", "gemini-3.7-flash"))
     anthropic_api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
     anthropic_model: str = field(
         default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+    )
+    # Groq: free tier, no credit card, OpenAI-compatible. Added after Gemini's
+    # free tier proved too tight for a daily run — gemini-3.7-flash allows only
+    # 20 requests/day and one edition needs roughly 15-20.
+    groq_api_key: str = field(default_factory=lambda: os.environ.get("GROQ_API_KEY", ""))
+    groq_model: str = field(
+        default_factory=lambda: os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
     )
 
     # --- Selection --------------------------------------------------------
@@ -115,8 +130,12 @@ class Config:
             problems.append("LLM_PROVIDER=gemini but GEMINI_API_KEY is not set.")
         if self.llm_provider == "anthropic" and not self.anthropic_api_key:
             problems.append("LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is not set.")
-        if self.llm_provider not in {"gemini", "anthropic"}:
-            problems.append(f"Unknown LLM_PROVIDER {self.llm_provider!r}; use gemini or anthropic.")
+        if self.llm_provider == "groq" and not self.groq_api_key:
+            problems.append("LLM_PROVIDER=groq but GROQ_API_KEY is not set.")
+        if self.llm_provider not in {"gemini", "anthropic", "groq"}:
+            problems.append(
+                f"Unknown LLM_PROVIDER {self.llm_provider!r}; use gemini, groq or anthropic."
+            )
         if not self.dry_run_send and self.email_provider == "console":
             problems.append(
                 "DRY_RUN_SEND is off but EMAIL_PROVIDER=console, so nothing would actually send."

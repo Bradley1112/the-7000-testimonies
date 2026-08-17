@@ -225,7 +225,7 @@ Everything is free-tier except the model. The real ceilings, in the order you wi
 | Service | Free tier | What happens when you outgrow it |
 |---|---|---|
 | **Brevo** | **300 emails/day** | **The first wall you hit.** 300 confirmed subscribers = 300 emails/day. Their paid plan starts around **$9/month** for 5,000/month, which is *fewer* daily sends than the free tier — check the daily-send limit, not the monthly total, before switching. MailerSend (3,000/month free) and Resend (3,000/month, 100/day) are alternatives, but a custom domain is what really unlocks volume. |
-| **Gemini 2.5 Flash** | Generous free tier in AI Studio | The only guaranteed cost. ~10 summaries/day at ~8k input and ~400 output tokens each ≈ **well under $1/month**. Even at 10× the volume it stays in single-digit dollars. Prompt caching is used; the Batch API is not — see below. |
+| **Gemini (flash tier)** | Generous free tier in AI Studio | The only guaranteed cost. ~10 summaries/day at ~8k input and ~400 output tokens each ≈ **well under $1/month**. Even at 10× the volume it stays in single-digit dollars. Prompt caching is used; the Batch API is not — see below. |
 | **Supabase** | 500MB database, 5GB bandwidth | Text-only rows: a year of editions is a few MB. Bandwidth from archive traffic will bite first. Paid tier **$25/month**. Free projects pause after a week of inactivity — the daily job keeps it awake. |
 | **Vercel** | 100GB bandwidth/month | Only at real traffic. Pro is **$20/month**. |
 | **GitHub Actions** | 2,000 minutes/month | The daily run takes 2–4 minutes: ~120 minutes/month. Not a concern. Public repos are unlimited. |
@@ -241,6 +241,7 @@ Everything is free-tier except the model. The real ceilings, in the order you wi
 
 Stated plainly rather than buried.
 
+- **The Gemini model name in `GEMINI_MODEL` will need attention over time.** The brief specified `gemini-2.5-flash`; that model is now retired for new API keys (confirmed 2026-08-17 — it 404s with "no longer available to new users" even though it still appears in the models list). The current default is `gemini-3.7-flash`, the newest non-preview flash-tier model at time of writing, chosen over the `gemini-flash-latest` alias so a scheduled job's output doesn't shift under you without warning. Google's flash line moves fast; if summaries start failing with a 404, check `https://ai.google.dev/gemini-api/docs/models` and update `GEMINI_MODEL` in `.env.local` and the GitHub Actions variable — one value, no code change.
 - **Email replies are not ingested.** The brief asked for replies to land in a stored feedback inbox. Inbound parsing needs a custom domain (Cloudflare Email Routing → webhook), which does not exist yet. Replies go to the Gmail address; the admin feedback inbox shows site comments only. The endpoint is straightforward to add once a domain exists.
 - **Seven countries have no coverage**, as above.
 - **The regional sources are low-yield.** Christian Daily and Mission Network News surface roughly 2 SEA items in 10, mostly persecution and legal news rather than testimony. They are included so the empty countries have some chance of appearing, ranked below local reporting, and labelled on the Sources page. If they mostly contribute news, demote them — do not loosen the newsletter's register to accommodate them.
