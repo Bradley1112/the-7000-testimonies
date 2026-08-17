@@ -118,6 +118,10 @@ class Config:
         default_factory=lambda: os.environ.get("EMAIL_TEST_RECIPIENT", "the7000testimonies@gmail.com")
     )
     request_timeout: int = field(default_factory=lambda: _int("REQUEST_TIMEOUT", 25))
+    # Shared secret for POST /api/revalidate, so a finished edition appears on
+    # the site immediately instead of waiting out the ISR window. Optional: if
+    # unset the engine simply skips the call and the site catches up on its own.
+    revalidate_secret: str = field(default_factory=lambda: os.environ.get("REVALIDATE_SECRET", ""))
 
     @property
     def user_agent(self) -> str:

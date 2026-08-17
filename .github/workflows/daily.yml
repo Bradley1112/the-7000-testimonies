@@ -68,6 +68,10 @@ jobs:
           EMAIL_FROM_ADDRESS: ${{ secrets.EMAIL_FROM_ADDRESS }}
           EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           EMAIL_TEST_RECIPIENT: ${{ secrets.EMAIL_TEST_RECIPIENT }}
+          # Lets the finished edition appear on the site immediately rather
+          # than after the ISR window, so the 7am email never links readers to
+          # a stale archive. Optional — the engine skips the call if unset.
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
           LOOKBACK_DAYS: ${{ vars.LOOKBACK_DAYS || '30' }}
           MAX_PER_COUNTRY: ${{ vars.MAX_PER_COUNTRY || '3' }}
           # Repository variable, not a secret, so it can be flipped in the UI

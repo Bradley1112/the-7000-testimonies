@@ -306,7 +306,38 @@ def main() -> int:
 
     db.publish_edition(edition_id, consolidation, sent or None)
     log.info("Published %s. Sent to %d recipient(s).", edition_date, sent)
+
+    revalidate_site(edition_date)
     return 0
+
+
+def revalidate_site(edition_date) -> None:
+    """
+    Ask the site to drop its cached archive pages now that a new edition exists.
+
+    Best-effort by design: the edition is already stored and sent by this point,
+    so a failure here means the site is briefly stale, not that anything is
+    lost. It must never turn a successful run into a failed one.
+    """
+    if not config.revalidate_secret:
+        log.info("REVALIDATE_SECRET not set — skipping cache revalidation. "
+                 "The site will catch up within the hour on its own.")
+        return
+
+    import requests
+
+    try:
+        resp = requests.post(
+            f"{config.site_url}/api/revalidate",
+            params={"secret": config.revalidate_secret, "date": edition_date.isoformat()},
+            timeout=config.request_timeout,
+        )
+        if resp.ok:
+            log.info("Site cache revalidated: %s", resp.json().get("revalidated"))
+        else:
+            log.warning("Revalidation returned %s: %s", resp.status_code, resp.text[:200])
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Could not reach the revalidation endpoint: %s", exc)
 
 
 if __name__ == "__main__":
