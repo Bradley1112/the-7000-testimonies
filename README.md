@@ -80,7 +80,7 @@ node scripts/pixel-art/generate.mjs && node scripts/pixel-art/email-banner.mjs
 
 Output is deterministic — re-running without edits produces byte-identical files.
 
-The scroll story uses **Press Start 2P**, self-hosted. Download `press-start-2p.woff2` from [Google Fonts](https://fonts.google.com/specimen/Press+Start+2P) into `public/fonts/`. Without it the story falls back to monospace, which is legible but less characterful.
+The scroll story uses **Press Start 2P**, self-hosted at `public/fonts/press-start-2p.woff2` and committed to the repo — nothing to download. It is served from our own origin rather than fetched from Google at runtime: one less third-party request, no layout shift, and the story still looks right if `fonts.gstatic.com` is blocked.
 
 ### 6. Run it
 
