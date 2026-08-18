@@ -73,14 +73,25 @@ export function emailShell({
 </html>`;
 }
 
-/** Masthead with the Scene 4 banner, linking back to the interactive story. */
+/**
+ * Header for the confirmation email: a solid green band carrying the verse
+ * the newsletter is named for, rather than the pixel-art Scene 4 banner used
+ * in the daily digest. A first-touch email whose only job is one click reads
+ * better anchored on the verse itself; the full pixel-art story is what
+ * subscribers discover once they land on the site.
+ *
+ * No CSS opacity here — Outlook's Word rendering engine handles it
+ * unreliably, so the muted label uses a fixed pale tint instead.
+ */
 export function masthead({ dateLabel }: { dateLabel?: string } = {}): string {
   return `
-<tr><td style="padding:0;">
-  <a href="${siteUrl()}" style="text-decoration:none;display:block;">
-    <img src="${siteUrl()}/email/banner-scene4.png" width="600" alt="Elijah at the cave entrance beneath a starry sky, with the silhouettes of seven thousand faithful standing behind him"
-         style="display:block;width:100%;max-width:600px;height:auto;border:0;image-rendering:pixelated;" />
-  </a>
+<tr><td style="background-color:${GREEN};padding:30px 24px;text-align:center;">
+  <p style="margin:0;font-family:${SANS};font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${GREEN_PALE};">
+    1 Kings 19:18
+  </p>
+  <p style="margin:10px 0 0 0;font-family:${SERIF};font-size:17px;font-style:italic;line-height:1.55;color:#FFFFFF;">
+    &ldquo;Yet I have reserved 7,000 in Israel who have not bowed to Baal.&rdquo;
+  </p>
 </td></tr>
 <tr><td style="padding:22px 24px 0 24px;font-family:${SERIF};">
   <h1 style="margin:0;font-size:26px;line-height:1.2;font-weight:bold;color:${GREEN};letter-spacing:-0.01em;">The 7000</h1>
@@ -115,12 +126,7 @@ ${masthead()}
 
   <hr style="border:0;border-top:1px solid ${RULE};margin:24px 0;" />
 
-  <p style="margin:0;font-size:15px;font-style:italic;color:${INK};">
-    &ldquo;Yet I reserve seven thousand in Israel&mdash;all whose knees have not bowed to Baal.&rdquo;
-  </p>
-  <p style="margin:6px 0 0 0;font-family:${SANS};font-size:13px;color:${INK_FAINT};">1 Kings 19:18</p>
-
-  <p style="margin:20px 0 0 0;font-family:${SANS};font-size:13px;color:${INK_FAINT};">
+  <p style="margin:0;font-family:${SANS};font-size:13px;color:${INK_FAINT};">
     If you did not sign up, ignore this email and nothing further will be sent.
   </p>
 </td></tr>`;
@@ -133,10 +139,10 @@ ${masthead()}
       body,
     }),
     text:
-      `The 7000 — daily testimonies from across Southeast Asia\n\n` +
+      `The 7000\n\n` +
+      `1 Kings 19:18 — "Yet I have reserved 7,000 in Israel who have not bowed to Baal."\n\n` +
       `Thank you for subscribing. Confirm your address to start receiving the daily email:\n\n` +
       `${confirmUrl}\n\n` +
-      `"Yet I reserve seven thousand in Israel—all whose knees have not bowed to Baal." — 1 Kings 19:18\n\n` +
       `If you did not sign up, ignore this email and nothing further will be sent.\n`,
   };
 }
