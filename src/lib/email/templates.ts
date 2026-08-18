@@ -87,10 +87,11 @@ export function masthead({ dateLabel }: { dateLabel?: string } = {}): string {
   return `
 <tr><td style="background-color:${GREEN};padding:30px 24px;text-align:center;">
   <p style="margin:0;font-family:${SANS};font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${GREEN_PALE};">
-    1 Kings 19:18
+    1 Kings 19:18 (NIV)
   </p>
   <p style="margin:10px 0 0 0;font-family:${SERIF};font-size:17px;font-style:italic;line-height:1.55;color:#FFFFFF;">
-    &ldquo;Yet I have reserved 7,000 in Israel who have not bowed to Baal.&rdquo;
+    &ldquo;Yet I reserve seven thousand in Israel&mdash;all whose knees have not bowed down to Baal
+    and whose mouths have not kissed him.&rdquo;
   </p>
 </td></tr>
 <tr><td style="padding:22px 24px 0 24px;font-family:${SERIF};">
@@ -140,7 +141,8 @@ ${masthead()}
     }),
     text:
       `The 7000\n\n` +
-      `1 Kings 19:18 — "Yet I have reserved 7,000 in Israel who have not bowed to Baal."\n\n` +
+      `1 Kings 19:18 (NIV) — "Yet I reserve seven thousand in Israel—all whose knees have not ` +
+      `bowed down to Baal and whose mouths have not kissed him."\n\n` +
       `Thank you for subscribing. Confirm your address to start receiving the daily email:\n\n` +
       `${confirmUrl}\n\n` +
       `If you did not sign up, ignore this email and nothing further will be sent.\n`,
